@@ -3,7 +3,7 @@ package expo
 import "encoding/json"
 
 // PushDetails contains optional fields from Expo push ticket/receipt details.
-// Expo may return string values (for example error codes) or nested objects (fcm, apns).
+// Expo may return string values, numbers, or nested objects (fcm, apns).
 type PushDetails map[string]string
 
 func (d *PushDetails) UnmarshalJSON(data []byte) error {
@@ -32,6 +32,11 @@ func decodeDetailsValue(raw json.RawMessage) (string, bool) {
 	var value string
 	if err := json.Unmarshal(raw, &value); err == nil {
 		return value, true
+	}
+
+	var number json.Number
+	if err := json.Unmarshal(raw, &number); err == nil {
+		return number.String(), true
 	}
 
 	var nested map[string]json.RawMessage

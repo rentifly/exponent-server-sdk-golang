@@ -78,9 +78,11 @@ type ReceiptsResponse struct {
 
 // PushReceipt is a delivery receipt for a previously sent push notification ticket.
 type PushReceipt struct {
-	Status  string      `json:"status"`
-	Message string      `json:"message"`
-	Details PushDetails `json:"details,omitempty"`
+	Status             string      `json:"status"`
+	Message            string      `json:"message"`
+	MessageEnum        *int        `json:"messageEnum,omitempty"`
+	MessageParamValues []string    `json:"messageParamValues,omitempty"`
+	Details            PushDetails `json:"details,omitempty"`
 }
 
 // SuccessStatus is the status returned from Expo on a success
