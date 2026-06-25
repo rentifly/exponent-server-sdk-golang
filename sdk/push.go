@@ -70,6 +70,19 @@ type Response struct {
 	Errors []map[string]string `json:"errors"`
 }
 
+// ReceiptsResponse is the HTTP response returned from an Expo getReceipts request.
+type ReceiptsResponse struct {
+	Data   map[string]PushReceipt `json:"data"`
+	Errors []map[string]string    `json:"errors"`
+}
+
+// PushReceipt is a delivery receipt for a previously sent push notification ticket.
+type PushReceipt struct {
+	Status  string            `json:"status"`
+	Message string            `json:"message"`
+	Details map[string]string `json:"details"`
+}
+
 // SuccessStatus is the status returned from Expo on a success
 const SuccessStatus = "ok"
 
@@ -128,6 +141,56 @@ func (r *PushResponse) ValidateResponse() error {
 		}
 	}
 	return err
+}
+
+// ValidateReceipt returns an error if the receipt indicates that delivery failed.
+func (r *PushReceipt) ValidateReceipt() error {
+	if r.Status == SuccessStatus {
+		return nil
+	}
+
+	err := &PushReceiptError{
+		Receipt: r,
+	}
+	if r.Details != nil {
+		e := r.Details["error"]
+		switch e {
+		case ErrorDeviceNotRegistered:
+			return &DeviceNotRegisteredReceiptError{PushReceiptError: *err}
+		case ErrorMessageTooBig:
+			return &MessageTooBigReceiptError{PushReceiptError: *err}
+		case ErrorMessageRateExceeded:
+			return &MessageRateExceededReceiptError{PushReceiptError: *err}
+		}
+	}
+	return err
+}
+
+// PushReceiptError is a base class for all push receipt errors.
+type PushReceiptError struct {
+	Receipt *PushReceipt
+}
+
+func (e *PushReceiptError) Error() string {
+	if e.Receipt != nil {
+		return e.Receipt.Message
+	}
+	return "Unknown push receipt error"
+}
+
+// DeviceNotRegisteredReceiptError is raised when the push token is no longer valid.
+type DeviceNotRegisteredReceiptError struct {
+	PushReceiptError
+}
+
+// MessageTooBigReceiptError is raised when the notification was too large.
+type MessageTooBigReceiptError struct {
+	PushReceiptError
+}
+
+// MessageRateExceededReceiptError is raised when messages were sent too frequently.
+type MessageRateExceededReceiptError struct {
+	PushReceiptError
 }
 
 // PushResponseError is a base class for all push reponse errors
@@ -189,5 +252,29 @@ func NewPushServerError(message string, response *http.Response,
 }
 
 func (e *PushServerError) Error() string {
+	return e.Message
+}
+
+// ReceiptsServerError is raised when the push receipts endpoint returns an invalid response.
+type ReceiptsServerError struct {
+	Message      string
+	Response     *http.Response
+	ResponseData *ReceiptsResponse
+	Errors       []map[string]string
+}
+
+// NewReceiptsServerError creates a new ReceiptsServerError object.
+func NewReceiptsServerError(message string, response *http.Response,
+	responseData *ReceiptsResponse,
+	errors []map[string]string) *ReceiptsServerError {
+	return &ReceiptsServerError{
+		Message:      message,
+		Response:     response,
+		ResponseData: responseData,
+		Errors:       errors,
+	}
+}
+
+func (e *ReceiptsServerError) Error() string {
 	return e.Message
 }
