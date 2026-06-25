@@ -78,9 +78,9 @@ type ReceiptsResponse struct {
 
 // PushReceipt is a delivery receipt for a previously sent push notification ticket.
 type PushReceipt struct {
-	Status  string            `json:"status"`
-	Message string            `json:"message"`
-	Details map[string]string `json:"details"`
+	Status  string      `json:"status"`
+	Message string      `json:"message"`
+	Details PushDetails `json:"details,omitempty"`
 }
 
 // SuccessStatus is the status returned from Expo on a success
@@ -106,7 +106,7 @@ type PushResponse struct {
 	ID			string			  `json:"id"`
 	Status      string            `json:"status"`
 	Message     string            `json:"message"`
-	Details     map[string]string `json:"details"`
+	Details     PushDetails `json:"details,omitempty"`
 }
 
 func (r *PushResponse) isSuccess() bool {
