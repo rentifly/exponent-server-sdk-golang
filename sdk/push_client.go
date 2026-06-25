@@ -64,16 +64,10 @@ func NewPushClient(config *ClientConfig) *PushClient {
 	return c
 }
 
-// Publish sends a single push notification
-// @param push_message: A PushMessage object
-// @return an array of PushResponse objects which contains the results.
-// @return error if any requests failed
-func (c *PushClient) Publish(message *PushMessage) (PushResponse, error) {
-	responses, err := c.PublishMultiple([]PushMessage{*message})
-	if err != nil {
-		return PushResponse{}, err
-	}
-	return responses[0], nil
+// Publish sends a push notification to one or more recipients.
+// Expo returns one push ticket per recipient in message.To.
+func (c *PushClient) Publish(message *PushMessage) ([]PushResponse, error) {
+	return c.PublishMultiple([]PushMessage{*message})
 }
 
 // PublishMultiple sends multiple push notifications at once
@@ -119,6 +113,7 @@ func (c *PushClient) publishInternal(messages []PushMessage) ([]PushResponse, er
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	// Check that we didn't receive an invalid response
 	err = checkStatus(resp)
@@ -141,17 +136,33 @@ func (c *PushClient) publishInternal(messages []PushMessage) ([]PushResponse, er
 	if r.Data == nil {
 		return nil, NewPushServerError("Invalid server response", resp, r, nil)
 	}
-	// Sanity check the response
-	if len(messages) != len(r.Data) {
+	// Expo returns one ticket per recipient, flattened across all messages.
+	expectedReceipts := countRecipients(messages)
+	if expectedReceipts != len(r.Data) {
 		message := "Mismatched response length. Expected %d receipts but only received %d"
-		errorMessage := fmt.Sprintf(message, len(messages), len(r.Data))
+		errorMessage := fmt.Sprintf(message, expectedReceipts, len(r.Data))
 		return nil, NewPushServerError(errorMessage, resp, r, nil)
 	}
-	// Add the original message to each response for reference
-	for i := range r.Data {
-		r.Data[i].PushMessage = messages[i]
-	}
+	attachPushMessages(messages, r.Data)
 	return r.Data, nil
+}
+
+func countRecipients(messages []PushMessage) int {
+	total := 0
+	for _, message := range messages {
+		total += len(message.To)
+	}
+	return total
+}
+
+func attachPushMessages(messages []PushMessage, responses []PushResponse) {
+	responseIndex := 0
+	for _, message := range messages {
+		for range message.To {
+			responses[responseIndex].PushMessage = message
+			responseIndex++
+		}
+	}
 }
 
 func checkStatus(resp *http.Response) error {
